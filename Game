@@ -1,0 +1,784 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Security;
+using System.Xml.Linq;
+
+/* List of things to do:
+ * update  Pause and Resume Button to include save function
+ * Make a Save Button via text file
+ * Ensure level 1 restrictions work
+ * Ensure level 2 restrictions work
+ * Ensure level 3 restrictions work
+ */
+
+
+/* List of things changed:
+ * Added DisplayGrid(); to undo function
+ * Added DisplayGrid(); and a writeline(); to resume function
+ * Change placement of ExpandGrid(); from end of CompleteLv1() to beginning of PlayLv2()
+ * Added an if statement to PlayLv3() so ExpandGrid executes if the grid is not already expanded
+ * Fixed undo function to reset lastplaced number
+ * Added previousRow and previousCol to Declarations
+ *  Added reviousRow = lastPlacedRow; to PlaceNumber();
+ *  Added previousCol = lastPlacedCol; to PlaceNumber();
+ *  Added lastPlacedRow = previousRow; to UndoLastMove()
+ *  Added lastPlacedCol = previousCol; to UndoLastMove()
+ */
+
+/* New Functions
+ * User can Select the level they want to start off (this would leave blank grids if they dont start from lv 1)
+ */
+
+
+class NumberGridGame
+{
+    #region Declarations
+
+    // Constants and variables declaration
+    static int gridSize = 5;
+    static int[,] grid = new int[gridSize, gridSize];
+    static int currentPlayerNumber = 2;
+    static List<int> enteredNumbers = new List<int>();
+    static bool gamePaused = false;
+    static bool playedLv1 = false;
+    static bool playedLv2 = false;
+    static bool playedLv3 = false;
+    static int lastPlacedRow;
+    static int lastPlacedCol;
+    static int previousRow;
+    static int previousCol;
+    static int num1Row;
+    static int num1Col;
+
+    //const string filePath = "grid_data.txt";
+
+    #endregion
+
+
+
+    static void Main(string[] args)    // Main function to start the game
+    {
+        //LoadGridData();
+
+        InitializeGrid();
+        selectedLevel();
+
+        //SaveGridData();
+    }
+
+    static void selectedLevel()
+    {
+        Console.WriteLine("Select a level to play:");
+        Console.WriteLine("Enter '1' for level 1");
+        Console.WriteLine("Enter '2' for level 2");
+        Console.WriteLine("Enter '3' for level 3");
+        bool levelSelction = false;
+        while (levelSelction == false)
+        {
+            string userInput = Console.ReadLine();
+            if (userInput.ToLower() == "1")
+            {
+                levelSelction = true;
+                PlayGame();
+            }
+            else if (userInput.ToLower() == "2")
+            {
+                levelSelction = true;
+                playedLv1 = true;
+                PlayGame();
+            }
+            else if (userInput.ToLower() == "3")
+            {
+                levelSelction = true;
+                playedLv1 = true;
+                playedLv2 = true;
+                PlayGame();
+            }
+            else
+            {
+                Console.WriteLine("Invalid Level Selection. Please enter a valid level");
+            }
+        }
+    }
+
+    static void PlayGame()    // Function to handle the game flow
+    {
+        if (playedLv1 == false)
+        {
+            PlayLv1();
+        }
+        else if (playedLv2 == false)
+        {
+            PlayLv2();
+        }
+        else if (playedLv3 == false)
+        {
+            PlayLv3();
+        }
+
+    }
+
+    /*
+    static void SaveGridData()
+    {
+        using (StreamWriter writer = new StreamWriter(filePath))
+        {
+            for (int i = 0; i < grid.GetLength(0); i++)
+            {
+                for (int j = 0; j < grid.GetLength(1); j++)
+                {
+                    writer.WriteLine($"{i},{j},{grid[i, j]}");
+                }
+            }
+        }
+    }
+
+    static void LoadGridData()
+    {
+        if (File.Exists(filePath))
+        {
+            using (StreamReader reader = new StreamReader(filePath))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    string[] parts = line.Split(',');
+                    if (parts.Length == 3 && int.TryParse(parts[0], out int i) && int.TryParse(parts[1], out int j) && int.TryParse(parts[2], out int value))
+                    {
+                        grid[i, j] = value;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // If the file doesn't exist, create it by saving grid data
+            SaveGridData();
+        }
+    }*/
+
+
+
+    #region Grid Methods
+
+
+    static void InitializeGrid()    // Function to initialize the grid
+    {
+        Random random = new Random(); //RANDOMIZE WHERE THE NUMBER 1 WILL START ON THE GRID
+        num1Row = random.Next(gridSize); // Set the initial row for number 1
+        num1Col = random.Next(gridSize); // Set the initial column for number 1
+        lastPlacedRow = num1Row;
+        lastPlacedCol = num1Col;
+        grid[num1Row, num1Col] = 1;
+        currentPlayerNumber = 2;
+    }
+
+    static void DisplayGrid()    // Function to display the current state of the grid
+    {
+        Console.WriteLine("Current Grid:"); // Output a header indicating the purpose of the display
+        for (int i = 0; i < gridSize; i++)
+        {
+            for (int j = 0; j < gridSize; j++)
+            {
+                int number = grid[i, j]; // Retrieve the number at the current grid position
+
+                if (number == 0)
+                {
+                    Console.Write(" -- "); // Output "--" for an empty cell
+                }
+                else
+                {
+                    Console.Write($" {number:00} "); // Output the number with leading zeros for a non-empty cell
+                }
+            }
+            Console.WriteLine(); // Move to the next line to display the next row of the grid
+        }
+    }
+
+    static void ExpandGrid()    // Function to expand the grid for level 2
+    {
+        int newGridSize = 7;
+        int[,] newGrid = new int[newGridSize, newGridSize];
+
+        for (int i = 0; i < gridSize; i++)
+        {
+            for (int j = 0; j < gridSize; j++)
+            {
+                newGrid[i + 1, j + 1] = grid[i, j];
+            }
+        }
+
+        gridSize = newGridSize;
+        grid = newGrid;
+    }
+
+    static void ClearInnerGrid() // Function to clear the inner ring of grid for level 3
+    {
+        // Set predefined values
+        int row = 4; int col = 2; grid[row, col] = 0;
+        row = 3; col = 1; grid[row, col] = 0;
+        row = 4; col = 1; grid[row, col] = 0;
+        row = 5; col = 1; grid[row, col] = 0;
+        row = 5; col = 2; grid[row, col] = 0;
+        row = 5; col = 3; grid[row, col] = 0;
+        row = 5; col = 4; grid[row, col] = 0;
+        row = 4; col = 3; grid[row, col] = 0;
+        row = 3; col = 2; grid[row, col] = 0;
+        row = 2; col = 1; grid[row, col] = 0;
+        row = 2; col = 2; grid[row, col] = 0;
+        row = 1; col = 1; grid[row, col] = 0;
+        row = 1; col = 2; grid[row, col] = 0;
+        row = 2; col = 3; grid[row, col] = 0;
+        row = 3; col = 3; grid[row, col] = 0;
+        row = 3; col = 4; grid[row, col] = 0;
+        row = 4; col = 5; grid[row, col] = 0;
+        row = 5; col = 5; grid[row, col] = 0;
+        row = 4; col = 4; grid[row, col] = 0;
+        row = 3; col = 5; grid[row, col] = 0;
+        row = 2; col = 5; grid[row, col] = 0;
+        row = 1; col = 5; grid[row, col] = 0;
+        row = 1; col = 4; grid[row, col] = 0;
+        row = 1; col = 3; grid[row, col] = 0;
+        row = 2; col = 4; grid[row, col] = 0;
+        grid[num1Row + 1 , num1Col +1 ] = 1;
+    }
+
+
+    #endregion
+
+
+
+    #region Input Methods
+
+    static int GetValidInputNumber() // Function to get a valid input number from the player
+    {
+        int inputNumber;
+        while (true)
+        {
+            string userInput = Console.ReadLine(); // Read the player's input
+            if (int.TryParse(userInput, out inputNumber))
+            {
+                return inputNumber; // If the input is a valid number, return it
+            }
+            else
+            {
+                if (userInput.ToLower() == "u")
+                {
+                    UndoLastMove(); // If the input is 'u', undo last move
+                }
+                else if (userInput.ToLower() == "p")
+                {
+                    Pause(); // If the input is 'p', pause the game
+                }
+                else if (userInput.ToLower() == "r")
+                {
+                    Resume(); // If the input is 'r', resume the game
+                }
+                else
+                {
+                    Console.WriteLine("Invalid input. Please enter a number, 'u' to undo, 'p' to pause, or 'r' to resume.");
+                    // Display an error message for invalid input, prompting the player to enter a number or 'p'
+                }
+            }
+        }
+    }
+
+    static bool IsValidInput(int inputNumber)    // Function to validate Level input
+    {
+        if (inputNumber == currentPlayerNumber && !enteredNumbers.Contains(inputNumber))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    static void ProcessValidInput(int inputNumber)    // Function to process a valid input number provided by the player
+    {
+        Console.Write($"Enter the row (1-{gridSize}) for the next number: ");
+        int row = GetValidGridCoordinate() - 1; // Get a valid row coordinate for the number placement
+
+        Console.Write($"Enter the column (1-{gridSize}) for the next number: ");
+        int col = GetValidGridCoordinate() - 1; // Get a valid column coordinate for the number placement
+
+        if (IsValidGridCell(row, col) && grid[row, col] == 0)
+        {
+            if (currentPlayerNumber > 25 && !IsValidRingPlacement(inputNumber, row, col))
+            {
+                Console.WriteLine("Invalid ring placement.");
+            }
+            else if (IsAdjacentToLastPlacedCell(row, col))
+            {
+                PlaceNumber(inputNumber, row, col);
+            }
+            else
+            {
+                Console.WriteLine("Invalid location. The cell must be adjacent to the last placed number.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Invalid location. Please choose an empty cell within the grid.");
+        }
+    }
+
+    static int GetValidGridCoordinate()    // Function to get a valid grid coordinate (row or column) from user input
+    {
+        int coordinate;
+        while (true)
+        {
+            string input = Console.ReadLine();
+            if (int.TryParse(input, out coordinate) && coordinate >= 1 && coordinate <= gridSize)
+            {
+                return coordinate; // Return the valid coordinate
+            }
+            else
+            {
+                Console.WriteLine($"Invalid input. Please enter a number between 1 and {gridSize}.");
+                // Prompt the user for input until a valid coordinate is entered
+            }
+        }
+    }
+
+    static void PlaceNumber(int inputnumber, int row, int col)    // Function to place a number on the grid at the specified row and column
+    {
+        previousRow = lastPlacedRow;
+        previousCol = lastPlacedCol;
+        Console.WriteLine(previousRow);
+        Console.WriteLine(previousCol);
+        grid[row, col] = inputnumber; // Set the grid cell at specified row and column to the given number
+        lastPlacedRow = row; // Update the last placed row for reference
+        lastPlacedCol = col; // Update the last placed column for reference
+        enteredNumbers.Add(inputnumber); // Add the number to the list of entered numbers
+        currentPlayerNumber++; // Increment the current player number for the next input
+    }
+
+    static bool IsValidGridCell(int row, int col)    // Function to check if the specified row and column are valid grid cells
+    {
+        return row >= 0 && row < gridSize && col >= 0 && col < gridSize;
+        // Returns true if the row and column are within the grid boundaries, otherwise false
+    }
+
+    static bool IsAdjacentToLastPlacedCell(int row, int col)     // Function to check if a cell is adjacent to the last placed cell
+    {
+        // Check if the given cell is adjacent to the last placed cell
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -1; j <= 1; j++)
+            {
+                if (i == 0 && j == 0) continue; // skip checking the cell itself
+
+                int newRow = row + i;
+                int newCol = col + j;
+
+                if (newRow == lastPlacedRow && newCol == lastPlacedCol)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    #endregion
+
+
+
+    #region Level 1 Methods
+
+    static void PlayLv1()
+    { Console.WriteLine("lvl 1 activated");
+        while (currentPlayerNumber <= 25)
+        {
+            if (!gamePaused)
+            {
+                DisplayGrid(); // Display the current state of the game grid
+                Console.WriteLine($"Enter the next number ({currentPlayerNumber}): ");
+                int inputNumber = GetValidInputNumber(); // Get a valid input number from the player
+
+                if (inputNumber == 115)
+                {
+                    SkipLv1(); // Skip Level 1 using a special code
+                }
+                else if (IsValidInput(inputNumber))
+                {
+                    ProcessValidInput(inputNumber); // Process the valid input number
+                }
+                else
+                {
+                    Console.WriteLine("Invalid input. Please try again."); // Display an error message for invalid input
+                }
+            }
+        }
+        if (currentPlayerNumber == 26)
+        {
+            CompleteLv1();
+        }
+    }
+
+    static void SkipLv1()    //Function to Skip Level 1
+    {
+        // Set predefined values
+        int row = 3; int col = 1; grid[row, col] = 1;
+        row = 2; col = 0; grid[row, col] = 2;
+        row = 3; col = 0; grid[row, col] = 3;
+        row = 4; col = 0; grid[row, col] = 4;
+        row = 4; col = 1; grid[row, col] = 5;
+        row = 4; col = 2; grid[row, col] = 6;
+        row = 4; col = 3; grid[row, col] = 7;
+        row = 3; col = 2; grid[row, col] = 8;
+        row = 2; col = 1; grid[row, col] = 9;
+        row = 1; col = 0; grid[row, col] = 10;
+        row = 1; col = 1; grid[row, col] = 11;
+        row = 0; col = 0; grid[row, col] = 12;
+        row = 0; col = 1; grid[row, col] = 13;
+        row = 1; col = 2; grid[row, col] = 14;
+        row = 2; col = 2; grid[row, col] = 15;
+        row = 2; col = 3; grid[row, col] = 16;
+        row = 3; col = 4; grid[row, col] = 17;
+        row = 4; col = 4; grid[row, col] = 18;
+        row = 3; col = 3; grid[row, col] = 19;
+        row = 2; col = 4; grid[row, col] = 20;
+        row = 1; col = 4; grid[row, col] = 21;
+        row = 0; col = 4; grid[row, col] = 22;
+        row = 0; col = 3; grid[row, col] = 23;
+        row = 0; col = 2; grid[row, col] = 24;
+        row = 1; col = 3; grid[row, col] = 25;
+        currentPlayerNumber = 26; // Set the current player number to 26 to end level 1
+    }
+
+    static void CompleteLv1()
+    {
+        playedLv1 = true;
+        Console.WriteLine("Congratulations! You have completed Level 1!"); // Congratulate the player for completing Level 1
+        Console.WriteLine("Here is your Level 1 Completed Grid!!!");
+        DisplayGrid();
+        Console.WriteLine("Begin Level 2");
+        currentPlayerNumber = 2; // Reset the player number for Level 2
+        enteredNumbers.Clear();
+        PlayGame(); // Start Level 2 of the game
+    }
+
+    #endregion
+
+
+
+    #region Level 2 Methods
+//LEVEL 2 START
+
+    static void PlayLv2()
+{
+    ExpandGrid(); // Expand the grid for Level 2 gameplay
+    int[] ring = new int[24]; // Define a ring of 24 additional empty cells
+    InitializeRing(ring); // Initialize the ring with zeros
+
+    while (currentPlayerNumber <= 25)
+    {
+        if (!gamePaused)
+        {
+            DisplayGrid(); // Display the current state of the game grid
+            Console.WriteLine($"Enter the next number ({currentPlayerNumber}): ");
+            int inputNumber = GetValidInputNumber(); // Get a valid input number from the player
+
+            if (inputNumber == 115)
+            {
+                SkipLv2(); // Skip Level 2 using a special code
+            }
+            else if (IsValidInput(inputNumber))
+            {
+                int[] validPositions = GetValidRingPositions(inputNumber); // Get valid ring positions for the input number
+                int enteredPosition = GetPlayerChosenPosition(validPositions); // Get the player's chosen position from the valid options
+                if (enteredPosition != -1) // Check if the player's choice is valid
+                {
+                    ring[enteredPosition] = inputNumber; // Place the number in the ring
+                    currentPlayerNumber++;
+                }
+                else
+                {
+                    Console.WriteLine("Invalid ring placement. Please try again.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Invalid input. Please try again.");
+            }
+        }
+    }
+
+    if (currentPlayerNumber == 26)
+    {
+        CompleteLv2(); // Signal the player "Level 2 completed!"
+    }
+}
+
+    //LEVEL 2 END
+
+    //NEW IMPLEMENTATIONS FOR LEVEL 2....
+
+static int[] GetValidRingPositions(int number)
+    {
+        // Assuming 'number' corresponds to a position in the grid,
+        // and valid positions are those that are horizontally or vertically adjacent.
+        int gridSize = 5;
+        int row = number / gridSize;
+        int col = number % gridSize;
+
+        var validPositions = new System.Collections.Generic.List<int>();
+
+        // Check above
+        if (row > 0) validPositions.Add(number - gridSize);
+        // Check below
+        if (row < gridSize - 1) validPositions.Add(number + gridSize);
+        // Check left
+        if (col > 0) validPositions.Add(number - 1);
+        // Check right
+        if (col < gridSize - 1) validPositions.Add(number + 1);
+
+        return validPositions.ToArray();
+    }
+
+static int GetPlayerChosenPosition(int[] validPositions)
+    {
+        Console.WriteLine("Choose a position from the following valid options:");
+        Console.WriteLine(string.Join(", ", validPositions));
+
+        while (true)
+        {
+            Console.Write("Enter your choice: ");
+            if (int.TryParse(Console.ReadLine(), out int chosenPosition))
+            {
+                if (validPositions.Contains(chosenPosition))
+                {
+                    return chosenPosition;
+                }
+                else
+                {
+                    Console.WriteLine("Invalid choice. Please try again.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Please enter a valid number.");
+            }
+        }
+    }
+
+static void InitializeRing(int[] ring)
+{
+    for (int i = 0; i < ring.Length; i++)
+    {
+        ring[i] = 0; // Initialize all elements to zero
+    }
+}
+
+    //END OF NEW IMPLEMENTATIONS FOR LEVEL 2....
+    static void SkipLv2()
+    {
+        //Console.ForegroundColor = ConsoleColor.Red;grid[row, col] = 2; Console.ResetColor();
+
+        // Set predefined values
+        int row = 6; int col = 1; grid[row, col] = 2;
+        row = 4; col = 6; grid[row, col] = 3;
+        row = 5; col = 0; grid[row, col] = 4;
+        row = 0; col = 2; grid[row, col] = 5;
+        row = 5; col = 6; grid[row, col] = 6;
+        row = 0; col = 4; grid[row, col] = 7;
+        row = 6; col = 3; grid[row, col] = 8;
+        row = 6; col = 2; grid[row, col] = 9;
+        row = 2; col = 0; grid[row, col] = 10;
+        row = 2; col = 6; grid[row, col] = 11;
+        row = 0; col = 1; grid[row, col] = 12;
+        row = 1; col = 6; grid[row, col] = 13;
+        row = 0; col = 3; grid[row, col] = 14;
+        row = 0; col = 0; grid[row, col] = 15;
+        row = 3; col = 6; grid[row, col] = 16;
+        row = 0; col = 5; grid[row, col] = 17;
+        row = 6; col = 6; grid[row, col] = 18;
+        row = 4; col = 0; grid[row, col] = 19;
+        row = 3; col = 0; grid[row, col] = 20;
+        row = 6; col = 5; grid[row, col] = 21;
+        row = 6; col = 0; grid[row, col] = 22;
+        row = 6; col = 4; grid[row, col] = 23;
+        row = 1; col = 0; grid[row, col] = 24;
+        row = 0; col = 6; grid[row, col] = 25;
+        currentPlayerNumber = 26; // Set the current player number to 27 to end level 1
+    }
+    static void CompleteLv2()
+    {
+        playedLv2 = true;
+        Console.WriteLine("Congratulations! You have completed Level 2!"); // Congratulate the player for completing Level 1
+        Console.WriteLine("Here is your Level 2 Completed Grid!!!");
+        DisplayGrid();
+        Console.WriteLine("Begin Level 3");
+        currentPlayerNumber = 2; // Reset the player number for Level 2
+        ClearInnerGrid();  // Clear inner ring of the grid for Level 3 gameplay
+        PlayGame(); // Start Level 3 of the game
+    }
+    #endregion
+
+
+
+    #region Level 3 Methods
+
+    static void PlayLv3()
+    {
+        if (gridSize != 7)
+        {
+            ExpandGrid();
+        }
+        while (currentPlayerNumber <= 25)
+        {
+            if (!gamePaused)
+            {
+                DisplayGrid(); // Display the current state of the game grid
+                Console.WriteLine($"Enter the next number ({currentPlayerNumber}): ");
+                int inputNumber = GetValidInputNumber(); // Get a valid input number from the player
+
+                if (inputNumber == 115)
+                {
+                    SkipLv3(); // Skip Level 3 using a special code
+                }
+                else if (IsValidInput(inputNumber))
+                {
+                    ProcessValidInput(inputNumber); // Process the valid input number
+                }
+                else
+                {
+                    Console.WriteLine("Invalid input. Please try again."); // Display an error message for invalid input
+                }
+            }
+        }
+        if (currentPlayerNumber == 26)
+        {
+            CompleteLv3();
+        }
+    }
+
+    static void SkipLv3()    //Function to Skip Level 3
+    {
+        // Set predefined values
+        int row = 4; int col = 2; grid[row, col] = 1;
+        row = 3; col = 1; grid[row, col] = 2;
+        row = 4; col = 1; grid[row, col] = 3;
+        row = 5; col = 1; grid[row, col] = 4;
+        row = 5; col = 2; grid[row, col] = 5;
+        row = 5; col = 3; grid[row, col] = 6;
+        row = 5; col = 4; grid[row, col] = 7;
+        row = 4; col = 3; grid[row, col] = 8;
+        row = 3; col = 2; grid[row, col] = 9;
+        row = 2; col = 1; grid[row, col] = 10;
+        row = 2; col = 2; grid[row, col] = 11;
+        row = 1; col = 1; grid[row, col] = 12;
+        row = 1; col = 2; grid[row, col] = 13;
+        row = 2; col = 3; grid[row, col] = 14;
+        row = 3; col = 3; grid[row, col] = 15;
+        row = 3; col = 4; grid[row, col] = 16;
+        row = 4; col = 5; grid[row, col] = 17;
+        row = 5; col = 5; grid[row, col] = 18;
+        row = 4; col = 4; grid[row, col] = 19;
+        row = 3; col = 5; grid[row, col] = 20;
+        row = 2; col = 5; grid[row, col] = 21;
+        row = 1; col = 5; grid[row, col] = 22;
+        row = 1; col = 4; grid[row, col] = 23;
+        row = 1; col = 3; grid[row, col] = 24;
+        row = 2; col = 4; grid[row, col] = 25;
+        currentPlayerNumber = 26; // Set the current player number to 26 to end level 3
+    }
+
+    static void CompleteLv3()
+    {
+        playedLv3 = true;
+        Console.WriteLine("Congratulations! You have completed Level 3!"); // Congratulate the player for completing Level 1
+        Console.WriteLine("You finished the game!!!");
+        Console.WriteLine("Here is your Level 3 Completed Grid!!!");
+        DisplayGrid();
+    }
+
+    #endregion
+
+
+
+    #region Methods: Undo, Pause, Resume
+    static void UndoLastMove()    // Function to undo the last move
+    {
+        // Function to undo the last move
+
+        if (enteredNumbers.Count > 0)
+        {
+            // Get the last entered number and remove it from the list
+            int lastEnteredNumber = enteredNumbers[enteredNumbers.Count - 1];
+            enteredNumbers.RemoveAt(enteredNumbers.Count - 1);
+
+            // Iterate through the grid to find the cell with the last entered number
+            for (int i = 0; i < gridSize; i++)
+            {
+                for (int j = 0; j < gridSize; j++)
+                {
+                    // Check if the current cell contains the last entered number
+                    if (grid[i, j] == lastEnteredNumber)
+                    {
+                        lastPlacedRow = previousRow; // Update the last placed row
+                        lastPlacedCol = previousCol; // Update the last placed column
+                        grid[i, j] = 0; // Set the grid cell to 0, undoing the last move
+                        currentPlayerNumber--; // Decrement the current player number to revert the move
+                        Console.WriteLine($"Move {lastEnteredNumber} undone.");
+
+                        return;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // If there are no moves to undo, display a message
+            Console.WriteLine("Cannot undo further. No moves to undo.");
+        }
+        DisplayGrid();
+    }
+
+    static void Pause()    //Function to Pause
+    {
+        Console.WriteLine("Game is paused. Press 'r' to resume...");
+        gamePaused = true;
+    }
+
+
+    static void Resume()    //Function to Resume
+    {
+        Console.WriteLine("Game is resumed. Press p to pause again...");
+        gamePaused = false;
+        DisplayGrid();
+        Console.WriteLine($"Enter the next number ({currentPlayerNumber}): ");
+    }
+
+    #endregion
+
+
+
+    static bool IsValidRingPlacement(int number, int row, int col)    // Function to validate Level 2 ring placement
+    {
+        if (row == 0 || row == gridSize - 1 || col == 0 || col == gridSize - 1) // If on the outer ring
+        {
+            for (int i = 1; i <= 5; i++)
+            {
+                for (int j = 1; j <= 5; j++)
+                {
+                    if (grid[i, j] == number)
+                    {
+                        if (i == row || j == col) // Same row or column as number in 5x5 grid
+                        {
+                            return true;
+                        }
+
+                        // Check for diagonal placement
+                        if ((i == j || i + j == 6) && (row == 0 || row == gridSize - 1 || col == 0 || col == gridSize - 1))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+}
